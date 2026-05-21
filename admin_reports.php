@@ -11,7 +11,7 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-$admin_name = $_SESSION['admin_name'] ?? 'CCS Administrator';
+$admin_name = $_SESSION['admin_name'] ?? 'CCS Admin';
 $admin_initial = strtoupper(substr($admin_name, 0, 2));
 
 // Get all students for report
@@ -78,9 +78,9 @@ if ($course_query) {
   
   /* Sidebar */
   .sidebar { width: 260px; background: #FFFFFF; border-right: 1px solid #E9EEF3; position: fixed; height: 100vh; padding: 28px 20px; display: flex; flex-direction: column; }
-  .logo-area { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; padding-left: 8px; }
+  .logo-area { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
   .logo-image { width: 38px; height: 38px; object-fit: contain; border-radius: 10px; }
-  .logo-icon { background: #3B82F6; width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; font-weight: 700; display: none; }
+  .logo-icon { background: #3B82F6; width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; }
   .logo-text { font-weight: 800; font-size: 20px; color: #0F172A; }
   .logo-text span { color: #3B82F6; }
   .nav-menu { flex: 1; display: flex; flex-direction: column; gap: 8px; }
@@ -95,7 +95,6 @@ if ($course_query) {
   /* Main Content */
   .main-content { margin-left: 260px; flex: 1; padding: 28px 36px; }
   .reports-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 16px; }
-  .reports-header h1 { font-size: 26px; font-weight: 700; color: #0F172A; }
   .btn-group { display: flex; gap: 12px; }
   .btn { padding: 10px 20px; border-radius: 40px; border: none; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; transition: all 0.2s; }
   .btn-pdf { background: #DC2626; color: white; }
@@ -147,7 +146,7 @@ if ($course_query) {
 <!-- UNIFIED SIDEBAR -->
 <div class="sidebar">
   <div class="logo-area">
-    <img src="ccslogo2.png" alt="CCS Logo" class="logo-image" onerror="this.onerror=null; this.style.display='none'; document.getElementById('adminFallbackLogo').style.display='flex';">
+    <img src="ccslogo.png" alt="CCS Logo" class="logo-image" onerror="this.onerror=null; this.style.display='none'; document.getElementById('adminFallbackLogo').style.display='flex';">
     <div id="adminFallbackLogo" class="logo-icon" style="display: none;"><i class="fas fa-graduation-cap"></i></div>
     <div class="logo-text">CCS <span>Admin</span></div>
   </div>
@@ -158,10 +157,8 @@ if ($course_query) {
     <a href="sit_in_management.php" class="nav-item"><i class="fas fa-chair"></i> Sit-in</a>
     <a href="reservation_management.php" class="nav-item"><i class="fas fa-calendar-alt"></i> Reservation</a>
     <a href="announcement_management.php" class="nav-item"><i class="fas fa-bullhorn"></i> Announcements</a>
-    <a href="reports.php" class="nav-item active"><i class="fas fa-chart-pie"></i> Reports</a>
+    <a href="admin_reports.php" class="nav-item active"><i class="fas fa-chart-pie"></i> Reports</a>
     <a href="leaderboard.php" class="nav-item"><i class="fas fa-trophy"></i> Leaderboard</a>
-    <a href="add_points.php" class="nav-item"><i class="fas fa-plus-circle"></i> Add Perusal/Point</a>
-    <a href="view_performance.php" class="nav-item"><i class="fas fa-chart-simple"></i> View Performance</a>
   </div>
   <div class="bottom-user">
     <div class="user-avatar"><?php echo $admin_initial; ?></div>
@@ -216,7 +213,7 @@ if ($course_query) {
                 </tr>
               <?php endwhile; ?>
             <?php else: ?>
-              <tr><td colspan="6" style="text-align:center; padding:40px;">No student records found</d><tr>
+              <tr><td colspan="6" style="text-align:center; padding:40px;">No student records found</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
@@ -248,7 +245,7 @@ if ($course_query) {
                 </tr>
               <?php endwhile; ?>
             <?php else: ?>
-              <tr><td colspan="10" style="text-align:center; padding:40px;">No sit-in records found</d></tr>
+              <tr><td colspan="10" style="text-align:center; padding:40px;">No sit-in records found</td></tr>
             <?php endif; ?>
           </tbody>
         </table>

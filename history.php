@@ -6,6 +6,39 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+$conn = new mysqli("localhost", "root", "", "jhyn");
+if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
+
+$user_id = $_SESSION['user_id'];
+$student_id_number = $_SESSION['id_number'] ?? '';
+
+// Fetch sit-in history from database
+$history_query = "SELECT 
+    s.id_number,
+    CONCAT(st.first_name, ' ', st.last_name) as student_name,
+    s.purpose,
+    s.laboratory,
+    DATE_FORMAT(s.time_in, '%h:%i %p') as time_in,
+    DATE_FORMAT(s.time_out, '%h:%i %p') as time_out,
+    DATE_FORMAT(s.created_at, '%Y-%m-%d') as date,
+    s.status,
+    s.points_earned
+FROM sit_in_sessions s
+LEFT JOIN students st ON s.id_number = st.id_number
+WHERE s.id_number = ?
+ORDER BY s.created_at DESC";
+
+$stmt = $conn->prepare($history_query);
+$stmt->bind_param("s", $student_id_number);
+$stmt->execute();
+$history_result = $stmt->get_result();
+
+$history_data = [];
+while ($row = $history_result->fetch_assoc()) {
+    $history_data[] = $row;
+}
+$stmt->close();
+
 $student_name = htmlspecialchars(trim(
     ($_SESSION['name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? '')
 ));
@@ -51,23 +84,33 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
     .logo-area {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       margin-bottom: 40px;
       padding-left: 8px;
     }
+    
+    .logo-image {
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+      border-radius: 12px;
+    }
+    
     .logo-icon {
       background: #3B82F6;
-      width: 38px;
-      height: 38px;
+      width: 42px;
+      height: 42px;
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 700;
       box-shadow: 0 6px 12px -6px rgba(59,130,246,0.25);
+      display: none;
     }
+    
     .logo-text {
       font-weight: 800;
       font-size: 20px;
@@ -380,42 +423,22 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
       background: #F8FAFE;
     }
 
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 30px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status-completed { background: #DCFCE7; color: #15803D; }
+    .status-active { background: #FEF3C7; color: #D97706; }
+    .points-badge { font-weight: 600; color: #F59E0B; }
+
     .no-data {
       text-align: center;
       color: #6C7A91;
       padding: 48px !important;
       font-style: italic;
-    }
-
-    /* Action Buttons */
-    .btn-action {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      border-radius: 8px;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s;
-      margin: 0 3px;
-    }
-    .btn-view {
-      background: #EFF6FF;
-      color: #3B82F6;
-    }
-    .btn-view:hover {
-      background: #3B82F6;
-      color: white;
-    }
-    .btn-delete {
-      background: #FEF2F2;
-      color: #EF4444;
-    }
-    .btn-delete:hover {
-      background: #EF4444;
-      color: white;
     }
 
     /* Footer */
@@ -495,7 +518,10 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
 <!-- SIDEBAR -->
 <div class="sidebar">
   <div class="logo-area">
-    <div class="logo-icon"><i class="fas fa-user-graduate"></i></div>
+    <img src="ccslogo2.png" alt="CCS Logo" class="logo-image" onerror="this.onerror=null; this.style.display='none'; document.getElementById('studentFallbackLogo').style.display='flex';">
+    <div id="studentFallbackLogo" class="logo-icon" style="display: none;">
+      <i class="fas fa-user-graduate"></i>
+    </div>
     <div class="logo-text">CCS <span>Student</span></div>
   </div>
   <div class="nav-menu">
@@ -565,28 +591,50 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
             <th onclick="sortTable(4)">Login <span class="sort-icon"><span class="asc"></span><span class="desc"></span></span></th>
             <th onclick="sortTable(5)">Logout <span class="sort-icon"><span class="asc"></span><span class="desc"></span></span></th>
             <th onclick="sortTable(6)">Date <span class="sort-icon"><span class="asc"></span><span class="desc"></span></span></th>
-            <th>Action</th>
+            <th>Points</th>
+            <th>Status</th>
           </tr>
         </thead>
-        <tbody id="tableBody"></tbody>
+        <tbody id="tableBody">
+          <?php if (count($history_data) > 0): ?>
+            <?php foreach ($history_data as $row): ?>
+              <tr>
+                <td><?php echo htmlspecialchars($row['id_number']); ?></td>
+                <td><?php echo htmlspecialchars($row['student_name']); ?></td>
+                <td><?php echo htmlspecialchars($row['purpose']); ?></td>
+                <td><?php echo htmlspecialchars($row['laboratory']); ?></td>
+                <td><?php echo htmlspecialchars($row['time_in']); ?></d>
+                <td><?php echo $row['time_out'] ? htmlspecialchars($row['time_out']) : '-'; ?></td>
+                <td><?php echo htmlspecialchars($row['date']); ?></d>
+                <td><span class="points-badge">⭐ <?php echo $row['points_earned'] ?? 0; ?></span></d>
+                <td><span class="status-badge status-<?php echo $row['status']; ?>"><?php echo ucfirst($row['status']); ?></span></d>
+              </tr>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <tr class="no-data">
+              <td colspan="9">
+                <i class="fas fa-folder-open" style="margin-right: 8px;"></i>No history entries found
+               </d>
+            </table>
+          <?php endif; ?>
+        </tbody>
       </table>
     </div>
 
     <div class="footer-bar">
-      <div class="showing-info" id="showingInfo">Showing 0 to 0 of 0 entries</div>
-      <div class="pagination" id="pagination"></div>
+      <div class="showing-info" id="showingInfo">
+        Showing <?php echo count($history_data); ?> of <?php echo count($history_data); ?> entries
+      </div>
+      <div class="pagination" id="pagination">
+        <button class="page-btn active" onclick="changePage(1)">1</button>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-  // Sample data - replace with actual database data via PHP
-  const allData = [
-    // { id: "2021-00123", name: "Juan dela Cruz", purpose: "Programming", lab: "Lab A", login: "08:15 AM", logout: "10:30 AM", date: "2024-01-15" },
-    // { id: "2022-00456", name: "Maria Santos", purpose: "Research", lab: "Lab B", login: "09:00 AM", logout: "11:45 AM", date: "2024-01-16" },
-    // { id: "2023-00789", name: "Jose Reyes", purpose: "Assignment", lab: "Lab C", login: "01:00 PM", logout: "03:30 PM", date: "2024-01-17" }
-  ];
-
+  // Get all data from PHP
+  const allData = <?php echo json_encode($history_data); ?>;
   let filtered = [...allData];
   let currentPage = 1;
   let perPage = 10;
@@ -602,26 +650,20 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
     tbody.innerHTML = '';
 
     if (pageData.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" class="no-data"><i class="fas fa-folder-open" style="margin-right: 8px;"></i>No entries found</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data"><i class="fas fa-folder-open" style="margin-right: 8px;"></i>No entries found</td></tr>';
     } else {
       pageData.forEach(row => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${escapeHtml(row.id)}</td>
-          <td>${escapeHtml(row.name)}</td>
+          <td>${escapeHtml(row.id_number)}</td>
+          <td>${escapeHtml(row.student_name)}</td>
           <td>${escapeHtml(row.purpose)}</td>
-          <td>${escapeHtml(row.lab)}</td>
-          <td>${escapeHtml(row.login)}</td>
-          <td>${escapeHtml(row.logout)}</td>
+          <td>${escapeHtml(row.laboratory)}</td>
+          <td>${escapeHtml(row.time_in)}</td>
+          <td>${escapeHtml(row.time_out) || '-'}</td>
           <td>${escapeHtml(row.date)}</td>
-          <td>
-            <button class="btn-action btn-view" onclick="viewRow('${escapeHtml(row.id)}')">
-              <i class="fas fa-eye"></i> View
-            </button>
-            <button class="btn-action btn-delete" onclick="deleteRow('${escapeHtml(row.id)}')">
-              <i class="fas fa-trash-alt"></i> Delete
-            </button>
-          </td>
+          <td><span class="points-badge">⭐ ${row.points_earned || 0}</span></td>
+          <td><span class="status-badge status-${row.status}">${row.status.charAt(0).toUpperCase() + row.status.slice(1)}</span></td>
         `;
         tbody.appendChild(tr);
       });
@@ -674,10 +716,10 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
       filtered = [...allData];
     } else {
       filtered = allData.filter(row => 
-        row.id.toLowerCase().includes(query) ||
-        row.name.toLowerCase().includes(query) ||
-        row.purpose.toLowerCase().includes(query) ||
-        row.lab.toLowerCase().includes(query)
+        (row.id_number && row.id_number.toLowerCase().includes(query)) ||
+        (row.student_name && row.student_name.toLowerCase().includes(query)) ||
+        (row.purpose && row.purpose.toLowerCase().includes(query)) ||
+        (row.laboratory && row.laboratory.toLowerCase().includes(query))
       );
     }
     currentPage = 1;
@@ -690,7 +732,12 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
     render();
   }
 
-  const KEYS = ['id', 'name', 'purpose', 'lab', 'login', 'logout', 'date'];
+  function changePage(page) {
+    currentPage = page;
+    render();
+  }
+
+  const KEYS = ['id_number', 'student_name', 'purpose', 'laboratory', 'time_in', 'time_out', 'date'];
   function sortTable(col) {
     if (sortCol === col) {
       sortAsc = !sortAsc;
@@ -700,8 +747,10 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
     }
     const key = KEYS[col];
     filtered.sort((a, b) => {
-      const valA = a[key].toLowerCase();
-      const valB = b[key].toLowerCase();
+      let valA = a[key] || '';
+      let valB = b[key] || '';
+      valA = String(valA).toLowerCase();
+      valB = String(valB).toLowerCase();
       if (sortAsc) {
         return valA < valB ? -1 : valA > valB ? 1 : 0;
       } else {
@@ -711,23 +760,9 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
     render();
   }
 
-  function viewRow(id) {
-    alert('View record: ' + id);
-    // Add your view logic here
-  }
-
-  function deleteRow(id) {
-    if (!confirm('Are you sure you want to delete record ' + id + '?')) return;
-    const index = allData.findIndex(r => r.id === id);
-    if (index > -1) {
-      allData.splice(index, 1);
-      filterTable();
-    }
-  }
-
   function escapeHtml(str) {
     if (!str) return '';
-    return str.replace(/[&<>]/g, function(m) {
+    return String(str).replace(/[&<>]/g, function(m) {
       if (m === '&') return '&amp;';
       if (m === '<') return '&lt;';
       if (m === '>') return '&gt;';

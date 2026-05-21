@@ -1,6 +1,6 @@
 <?php
 // ============================================
-// SEARCH_STUDENT.PHP - Search and manage students
+// SEARCH_STUDENT.PHP - Enhanced Search and manage students
 // ============================================
 session_start();
 
@@ -17,15 +17,15 @@ if ($conn->connect_error) {
 }
 
 // Get admin info
-$admin_name = $_SESSION['admin_name'] ?? 'CCS Admin';
+$admin_name = $_SESSION['admin_name'] ?? 'CCS Administrator';
 $admin_initial = strtoupper(substr($admin_name, 0, 2));
 
-// Get statistics
+// Get statistics with proper counts
 $total_students_query = "SELECT COUNT(*) as total FROM students";
 $total_students_result = $conn->query($total_students_query);
 $total_students = $total_students_result->fetch_assoc()['total'];
 
-$total_sitin_query = "SELECT COUNT(*) as total FROM sit_in_sessions";
+$total_sitin_query = "SELECT COUNT(*) as total FROM sit_in_sessions WHERE status = 'completed'";
 $total_sitin_result = $conn->query($total_sitin_query);
 $total_sitin = $total_sitin_result ? $total_sitin_result->fetch_assoc()['total'] : 0;
 
@@ -33,10 +33,27 @@ $current_sitin_query = "SELECT COUNT(*) as total FROM sit_in_sessions WHERE stat
 $current_sitin_result = $conn->query($current_sitin_query);
 $current_sitin = $current_sitin_result ? $current_sitin_result->fetch_assoc()['total'] : 0;
 
-// Handle search
+// Get monthly comparison for trends
+$last_month_sitins = $conn->query("SELECT COUNT(*) as total FROM sit_in_sessions WHERE status = 'completed' AND created_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)")->fetch_assoc()['total'];
+$prev_month_sitins = $conn->query("SELECT COUNT(*) as total FROM sit_in_sessions WHERE status = 'completed' AND created_at BETWEEN DATE_SUB(NOW(), INTERVAL 2 MONTH) AND DATE_SUB(NOW(), INTERVAL 1 MONTH)")->fetch_assoc()['total'];
+$trend_percentage = $prev_month_sitins > 0 ? round((($last_month_sitins - $prev_month_sitins) / $prev_month_sitins) * 100) : 0;
+
+// Get active student IDs (currently sitting in)
+$active_students = [];
+$active_query = $conn->query("SELECT DISTINCT id_number FROM sit_in_sessions WHERE status = 'active'");
+if ($active_query) {
+    while ($row = $active_query->fetch_assoc()) {
+        $active_students[] = $row['id_number'];
+    }
+}
+
+// Handle search parameters
 $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
 $filter_status = isset($_GET['status']) ? $_GET['status'] : '';
 $filter_course = isset($_GET['course']) ? $_GET['course'] : '';
+$filter_year = isset($_GET['year']) ? $_GET['year'] : '';
+$sort_by = isset($_GET['sort']) ? $_GET['sort'] : 'last_name';
+$sort_order = isset($_GET['order']) && $_GET['order'] == 'desc' ? 'DESC' : 'ASC';
 
 // Build search conditions
 $conditions = [];
@@ -59,17 +76,75 @@ if (!empty($filter_course)) {
     $types .= "s";
 }
 
+if (!empty($filter_year)) {
+    $conditions[] = "year_level = ?";
+    $params[] = $filter_year;
+    $types .= "s";
+}
+
+// Status filter is applied in PHP (based on active sessions)
 $where_clause = !empty($conditions) ? "WHERE " . implode(" AND ", $conditions) : "";
 
-// Get students
-$query = "SELECT *, CONCAT(first_name, ' ', last_name) as full_name FROM students $where_clause ORDER BY first_name ASC";
+// Get students with sorting
+$valid_sort_columns = ['id_number', 'first_name', 'last_name', 'course', 'year_level', 'sessions', 'total_points'];
+if (!in_array($sort_by, $valid_sort_columns)) {
+    $sort_by = 'last_name';
+}
+$query = "SELECT *, CONCAT(first_name, ' ', last_name) as full_name FROM students $where_clause ORDER BY $sort_by $sort_order";
 $stmt = $conn->prepare($query);
 if (!empty($params)) {
     $stmt->bind_param($types, ...$params);
 }
 $stmt->execute();
 $students = $stmt->get_result();
-$student_count = $students->num_rows;
+
+// Process students with real-time status
+$processed_students = [];
+while ($row = $students->fetch_assoc()) {
+    // Determine real status
+    $is_sitting = in_array($row['id_number'], $active_students);
+    $has_sessions = $row['sessions'] > 0;
+    
+    if ($is_sitting) {
+        $status = 'sitting';
+        $status_class = 'status-sitting';
+        $status_text = 'Sitting-In';
+        $status_icon = 'fa-chair';
+    } elseif ($has_sessions) {
+        $status = 'active';
+        $status_class = 'status-active';
+        $status_text = 'Active';
+        $status_icon = 'fa-check-circle';
+    } else {
+        $status = 'inactive';
+        $status_class = 'status-offline';
+        $status_text = 'Inactive';
+        $status_icon = 'fa-circle';
+    }
+    
+    // Apply status filter
+    if (!empty($filter_status) && $filter_status != $status) {
+        continue;
+    }
+    
+    $row['status'] = $status;
+    $row['status_class'] = $status_class;
+    $row['status_text'] = $status_text;
+    $row['status_icon'] = $status_icon;
+    $row['initials'] = strtoupper(substr($row['first_name'], 0, 1) . substr($row['last_name'], 0, 1));
+    $processed_students[] = $row;
+}
+
+$student_count = count($processed_students);
+
+// Get course distribution for filter counts
+$course_counts = [];
+$course_count_query = $conn->query("SELECT course, COUNT(*) as count FROM students GROUP BY course");
+if ($course_count_query) {
+    while ($row = $course_count_query->fetch_assoc()) {
+        $course_counts[$row['course']] = $row['count'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -107,7 +182,6 @@ $student_count = $students->num_rows;
     bottom: 0;
     z-index: 10;
     padding: 28px 20px;
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.02);
   }
 
   .logo-area {
@@ -136,13 +210,12 @@ $student_count = $students->num_rows;
     color: white;
     font-size: 18px;
     font-weight: 700;
-    box-shadow: 0 6px 12px -6px rgba(59,130,246,0.25);
+    display: none;
   }
   
   .logo-text {
     font-weight: 800;
     font-size: 20px;
-    letter-spacing: -0.3px;
     color: #0F172A;
   }
   .logo-text span {
@@ -164,14 +237,11 @@ $student_count = $students->num_rows;
     color: #5B6E8C;
     font-weight: 500;
     font-size: 14px;
-    transition: all 0.2s;
-    cursor: pointer;
     text-decoration: none;
+    transition: all 0.2s;
   }
   .nav-item i {
     width: 22px;
-    font-size: 1.2rem;
-    color: #7E8BA0;
   }
   .nav-item:hover {
     background: #F1F5F9;
@@ -203,12 +273,10 @@ $student_count = $students->num_rows;
     justify-content: center;
     color: white;
     font-weight: 700;
-    font-size: 16px;
   }
   .user-details h4 {
     font-size: 14px;
     font-weight: 700;
-    color: #0F172A;
   }
   .user-details p {
     font-size: 12px;
@@ -219,9 +287,6 @@ $student_count = $students->num_rows;
     color: #EF4444;
     text-decoration: none;
   }
-  .logout-icon:hover {
-    opacity: 0.8;
-  }
 
   /* ========= MAIN CONTENT ========= */
   .main-content {
@@ -230,7 +295,6 @@ $student_count = $students->num_rows;
     padding: 28px 36px;
   }
 
-  /* Top header */
   .top-header {
     display: flex;
     justify-content: space-between;
@@ -240,8 +304,6 @@ $student_count = $students->num_rows;
   .page-breadcrumb h1 {
     font-size: 26px;
     font-weight: 700;
-    color: #0F172A;
-    letter-spacing: -0.4px;
   }
   .breadcrumb-links {
     display: flex;
@@ -254,58 +316,8 @@ $student_count = $students->num_rows;
     color: #3B82F6;
     font-weight: 500;
   }
-  .header-actions {
-    display: flex;
-    gap: 16px;
-    align-items: center;
-  }
-  .notif-btn {
-    background: white;
-    border-radius: 40px;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    border: 1px solid #E9EEF3;
-    cursor: pointer;
-    color: #4B5565;
-    transition: all 0.2s;
-    position: relative;
-  }
-  .notif-btn:hover {
-    background: #F8FAFE;
-    border-color: #CBD5E1;
-  }
-  .notif-dot {
-    position: absolute;
-    top: 10px;
-    right: 12px;
-    width: 8px;
-    height: 8px;
-    background: #EF4444;
-    border-radius: 50%;
-    border: 1px solid white;
-  }
-  .admin-chip {
-    background: white;
-    border-radius: 40px;
-    padding: 6px 18px 6px 12px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    border: 1px solid #E9EEF3;
-    font-weight: 500;
-    font-size: 13px;
-    color: #1E293B;
-  }
-  .admin-chip i {
-    color: #3B82F6;
-    font-size: 16px;
-  }
 
-  /* ========= STATS ROW ========= */
+  /* Stats Row */
   .stats-row {
     display: flex;
     gap: 24px;
@@ -320,30 +332,33 @@ $student_count = $students->num_rows;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    transition: transform 0.2s, box-shadow 0.2s;
   }
-  .stat-left {
-    flex: 1;
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.05);
   }
   .stat-title {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
-    color: #5B6E8C;
+    color: #6C7A91;
     text-transform: uppercase;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
   .stat-number {
     font-size: 34px;
     font-weight: 800;
     color: #0F172A;
-    line-height: 1.2;
   }
   .stat-trend {
     font-size: 12px;
-    color: #10B981;
     margin-top: 8px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
+  }
+  .stat-trend.positive {
+    color: #10B981;
+  }
+  .stat-trend.negative {
+    color: #EF4444;
   }
   .stat-icon {
     width: 48px;
@@ -357,7 +372,7 @@ $student_count = $students->num_rows;
     font-size: 22px;
   }
 
-  /* ========= SEARCH SECTION ========= */
+  /* Search Section */
   .search-card {
     background: white;
     border-radius: 24px;
@@ -368,7 +383,6 @@ $student_count = $students->num_rows;
   .search-title {
     font-size: 18px;
     font-weight: 700;
-    color: #0F172A;
     margin-bottom: 8px;
   }
   .search-subtitle {
@@ -383,36 +397,51 @@ $student_count = $students->num_rows;
   }
   .search-input-group input {
     flex: 1;
-    padding: 12px 16px;
+    padding: 14px 18px;
     border: 1.5px solid #E2E8F0;
-    border-radius: 12px;
+    border-radius: 14px;
     font-size: 14px;
     font-family: 'Inter', sans-serif;
     outline: none;
+    transition: all 0.2s;
   }
   .search-input-group input:focus {
     border-color: #3B82F6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
   }
   .search-input-group button {
     background: #3B82F6;
     color: white;
     border: none;
-    padding: 12px 24px;
-    border-radius: 12px;
+    padding: 14px 28px;
+    border-radius: 14px;
     font-weight: 600;
     cursor: pointer;
+    transition: background 0.2s;
+  }
+  .search-input-group button:hover {
+    background: #2563EB;
+  }
+  .clear-search {
+    background: #F1F5F9;
+    color: #475569;
+  }
+  .clear-search:hover {
+    background: #E2E8F0;
   }
 
-  /* Filter chips */
+  /* Filter Chips */
   .filter-section {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
     margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #F0F2F5;
   }
   .filter-chip {
-    padding: 8px 16px;
-    border-radius: 30px;
+    padding: 8px 18px;
+    border-radius: 40px;
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -420,6 +449,12 @@ $student_count = $students->num_rows;
     color: #475569;
     transition: all 0.2s;
     text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .filter-chip i {
+    font-size: 12px;
   }
   .filter-chip:hover {
     background: #E2E8F0;
@@ -428,18 +463,53 @@ $student_count = $students->num_rows;
     background: #3B82F6;
     color: white;
   }
+  .filter-chip .count {
+    background: rgba(0,0,0,0.1);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+  }
+  .filter-chip.active .count {
+    background: rgba(255,255,255,0.2);
+  }
 
-  /* Results */
-  .results-header {
+  /* Sorting Bar */
+  .sorting-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
   }
   .results-count {
     font-size: 14px;
     font-weight: 600;
     color: #3B82F6;
+    background: #EFF6FF;
+    padding: 6px 14px;
+    border-radius: 40px;
+  }
+  .sort-options {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .sort-label {
+    font-size: 12px;
+    color: #6C7A91;
+  }
+  .sort-link {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    text-decoration: none;
+    color: #6C7A91;
+    background: #F1F5F9;
+  }
+  .sort-link.active {
+    background: #3B82F6;
+    color: white;
   }
 
   /* Table */
@@ -458,16 +528,17 @@ $student_count = $students->num_rows;
   }
   th {
     text-align: left;
-    padding: 14px 20px;
+    padding: 16px 20px;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     color: #6C7A91;
     background: #FCFDFF;
     border-bottom: 1px solid #EDF2F7;
+    letter-spacing: 0.5px;
   }
   td {
-    padding: 14px 20px;
+    padding: 16px 20px;
     font-size: 13px;
     color: #1E293B;
     border-bottom: 1px solid #F1F5F9;
@@ -475,30 +546,44 @@ $student_count = $students->num_rows;
   tr:hover td {
     background: #F8FAFE;
   }
+  
   .student-info {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
   }
   .student-avatar {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
-    border-radius: 12px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 16px;
     color: #3B82F6;
   }
+  .student-details {
+    display: flex;
+    flex-direction: column;
+  }
+  .student-name {
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .student-email {
+    font-size: 11px;
+    color: #6C7A91;
+  }
+
   .status-badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    border-radius: 30px;
-    font-size: 11px;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 40px;
+    font-size: 12px;
     font-weight: 600;
   }
   .status-active {
@@ -513,28 +598,120 @@ $student_count = $students->num_rows;
     background: #F1F5F9;
     color: #475569;
   }
+  
   .action-icons {
     display: flex;
-    gap: 12px;
+    gap: 14px;
+  }
+  .action-icons a {
+    text-decoration: none;
   }
   .action-icons i {
     cursor: pointer;
-    font-size: 16px;
+    font-size: 18px;
+    transition: transform 0.1s;
+  }
+  .action-icons i:hover {
+    transform: scale(1.1);
   }
   .fa-edit { color: #3B82F6; }
   .fa-trash-alt { color: #EF4444; }
   .fa-eye { color: #10B981; }
+  .fa-clock { color: #F59E0B; }
+
+  .empty-row td {
+    text-align: center;
+    padding: 60px !important;
+  }
+  .empty-icon {
+    font-size: 48px;
+    color: #CBD5E1;
+    margin-bottom: 16px;
+    display: block;
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px;
+    border-top: 1px solid #F0F2F5;
+  }
+  .page-btn {
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: #F1F5F9;
+    color: #475569;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .page-btn.active {
+    background: #3B82F6;
+    color: white;
+  }
+  .page-btn:hover:not(.active) {
+    background: #E2E8F0;
+  }
+
+  /* Quick Action Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+  }
+  .modal-content {
+    background: white;
+    border-radius: 24px;
+    width: 90%;
+    max-width: 450px;
+    padding: 28px;
+  }
+  .modal-content h3 {
+    margin-bottom: 20px;
+  }
+  .modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+  }
+  .modal-buttons button {
+    padding: 10px 20px;
+    border-radius: 40px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-confirm {
+    background: #3B82F6;
+    color: white;
+  }
+  .btn-cancel {
+    background: #F1F5F9;
+    color: #475569;
+  }
 
   @media (max-width: 1000px) {
     .main-content { margin-left: 0; padding: 20px; }
     .stats-row { flex-direction: column; }
     .search-input-group { flex-direction: column; }
+    .sorting-bar { flex-direction: column; align-items: flex-start; }
   }
 </style>
 </head>
 <body>
 
-<!-- UNIFIED SIDEBAR - Same as admin_dashboard.php -->
+<!-- SIDEBAR -->
 <div class="sidebar">
   <div class="logo-area">
     <img src="ccslogo2.png" alt="CCS Logo" class="logo-image" onerror="this.onerror=null; this.style.display='none'; document.getElementById('adminFallbackLogo').style.display='flex';">
@@ -544,30 +721,16 @@ $student_count = $students->num_rows;
     <div class="logo-text">CCS <span>Admin</span></div>
   </div>
   <div class="nav-menu">
-    <a href="admin_dashboard.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'admin_dashboard.php' ? 'active' : ''; ?>">
-      <i class="fas fa-chart-line"></i> Dashboard
-    </a>
-    <a href="Search_Student.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'Search_Student.php' ? 'active' : ''; ?>">
-      <i class="fas fa-search"></i> Search Student
-    </a>
-    <a href="Student_Information.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'Student_Information.php' ? 'active' : ''; ?>">
-      <i class="fas fa-users"></i> Students
-    </a>
-    <a href="sit_in_management.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'sit_in_management.php' ? 'active' : ''; ?>">
-      <i class="fas fa-chair"></i> Sit-in
-    </a>
-    <a href="reservation_management.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'reservation_management.php' ? 'active' : ''; ?>">
-      <i class="fas fa-calendar-alt"></i> Reservation
-    </a>
-    <a href="announcement_management.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'announcement_management.php' ? 'active' : ''; ?>">
-      <i class="fas fa-bullhorn"></i> Announcements
-    </a>
-    <a href="reports.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'admin_reports.php' ? 'active' : ''; ?>">
-      <i class="fas fa-chart-pie"></i> Reports
-    </a>
-    <a href="leaderboard.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'leaderboard.php' ? 'active' : ''; ?>">
-      <i class="fas fa-trophy"></i> Leaderboard
-    </a>
+    <a href="admin_dashboard.php" class="nav-item"><i class="fas fa-chart-line"></i> Dashboard</a>
+    <a href="Search_Student.php" class="nav-item active"><i class="fas fa-search"></i> Search Student</a>
+    <a href="Student_Information.php" class="nav-item"><i class="fas fa-users"></i> Students</a>
+    <a href="sit_in_management.php" class="nav-item"><i class="fas fa-chair"></i> Sit-in</a>
+    <a href="reservation_management.php" class="nav-item"><i class="fas fa-calendar-alt"></i> Reservation</a>
+    <a href="announcement_management.php" class="nav-item"><i class="fas fa-bullhorn"></i> Announcements</a>
+    <a href="reports.php" class="nav-item"><i class="fas fa-chart-pie"></i> Reports</a>
+    <a href="leaderboard.php" class="nav-item"><i class="fas fa-trophy"></i> Leaderboard</a>
+    <a href="add_points.php" class="nav-item"><i class="fas fa-plus-circle"></i> Add Perusal/Point</a>
+    <a href="view_performance.php" class="nav-item"><i class="fas fa-chart-simple"></i> View Performance</a>
   </div>
   <div class="bottom-user">
     <div class="user-avatar"><?php echo $admin_initial; ?></div>
@@ -589,40 +752,36 @@ $student_count = $students->num_rows;
         <span>Search Student</span>
       </div>
     </div>
-    <div class="header-actions">
-      <div class="notif-btn">
-        <i class="far fa-bell"></i>
-        <div class="notif-dot"></div>
-      </div>
-      <div class="admin-chip"><i class="fas fa-user-shield"></i> Admin · <strong>CCS</strong></div>
-    </div>
   </div>
 
   <!-- Stats Row -->
   <div class="stats-row">
     <div class="stat-card">
       <div class="stat-left">
-        <div class="stat-title">Total Sit-in</div>
+        <div class="stat-title"><i class="fas fa-clock"></i> Total Sit-in</div>
         <div class="stat-number"><?php echo $total_sitin; ?></div>
-        <div class="stat-trend"><i class="fas fa-arrow-up"></i> +12% since last month</div>
+        <div class="stat-trend <?php echo $trend_percentage >= 0 ? 'positive' : 'negative'; ?>">
+          <i class="fas fa-arrow-<?php echo $trend_percentage >= 0 ? 'up' : 'down'; ?>"></i>
+          <?php echo abs($trend_percentage); ?>% since last month
+        </div>
       </div>
-      <div class="stat-icon"><i class="fas fa-clock"></i></div>
+      <div class="stat-icon"><i class="fas fa-history"></i></div>
     </div>
     <div class="stat-card">
       <div class="stat-left">
-        <div class="stat-title">Currently Sit-in</div>
+        <div class="stat-title"><i class="fas fa-chair"></i> Currently Sit-in</div>
         <div class="stat-number"><?php echo $current_sitin; ?></div>
         <div class="stat-trend">Active sessions right now</div>
       </div>
-      <div class="stat-icon"><i class="fas fa-chair"></i></div>
+      <div class="stat-icon"><i class="fas fa-users"></i></div>
     </div>
     <div class="stat-card">
       <div class="stat-left">
-        <div class="stat-title">Total Students</div>
+        <div class="stat-title"><i class="fas fa-user-graduate"></i> Total Students</div>
         <div class="stat-number"><?php echo $total_students; ?></div>
         <div class="stat-trend">+<?php echo $total_students; ?> this semester</div>
       </div>
-      <div class="stat-icon"><i class="fas fa-users"></i></div>
+      <div class="stat-icon"><i class="fas fa-graduation-cap"></i></div>
     </div>
   </div>
 
@@ -631,29 +790,69 @@ $student_count = $students->num_rows;
     <div class="search-title">Find a Student</div>
     <div class="search-subtitle">Search by name, ID number, email, or course — manage sit-in records</div>
     
-    <form method="GET" action="Search_Student.php">
+    <form method="GET" action="Search_Student.php" id="searchForm">
       <div class="search-input-group">
-        <input type="text" name="search" placeholder="Juan, 2024-0803, BSCS..." value="<?php echo htmlspecialchars($search_query); ?>">
+        <input type="text" name="search" id="searchInput" placeholder="Search by name, ID, email, or course..." value="<?php echo htmlspecialchars($search_query); ?>" autocomplete="off">
         <button type="submit"><i class="fas fa-search"></i> Search</button>
+        <?php if (!empty($search_query) || !empty($filter_status) || !empty($filter_course)): ?>
+          <a href="Search_Student.php" class="clear-search" style="background:#F1F5F9; color:#475569; padding:14px 28px; border-radius:14px; text-decoration:none; font-weight:600;"><i class="fas fa-times"></i> Clear</a>
+        <?php endif; ?>
       </div>
     </form>
 
+    <!-- Filter Chips -->
     <div class="filter-section">
-      <a href="?search=<?php echo urlencode($search_query); ?>" class="filter-chip <?php echo empty($filter_status) && empty($filter_course) ? 'active' : ''; ?>">All Students</a>
-      <a href="?search=<?php echo urlencode($search_query); ?>&status=active" class="filter-chip <?php echo $filter_status == 'active' ? 'active' : ''; ?>">Active</a>
-      <a href="?search=<?php echo urlencode($search_query); ?>&status=sitting" class="filter-chip <?php echo $filter_status == 'sitting' ? 'active' : ''; ?>">Sitting-in</a>
-      <a href="?search=<?php echo urlencode($search_query); ?>&status=offline" class="filter-chip <?php echo $filter_status == 'offline' ? 'active' : ''; ?>">Offline</a>
-      <a href="?search=<?php echo urlencode($search_query); ?>&course=BSIT" class="filter-chip <?php echo $filter_course == 'BSIT' ? 'active' : ''; ?>">BSIT</a>
-      <a href="?search=<?php echo urlencode($search_query); ?>&course=BSCS" class="filter-chip <?php echo $filter_course == 'BSCS' ? 'active' : ''; ?>">BSCS</a>
-      <a href="?search=<?php echo urlencode($search_query); ?>&course=BSIS" class="filter-chip <?php echo $filter_course == 'BSIS' ? 'active' : ''; ?>">BSIS</a>
+      <a href="?<?php echo http_build_query(array_filter(['search' => $search_query, 'course' => $filter_course, 'year' => $filter_year])); ?>" class="filter-chip <?php echo empty($filter_status) ? 'active' : ''; ?>">
+        <i class="fas fa-users"></i> All Students
+      </a>
+      <a href="?<?php echo http_build_query(array_filter(['search' => $search_query, 'status' => 'active', 'course' => $filter_course, 'year' => $filter_year])); ?>" class="filter-chip <?php echo $filter_status == 'active' ? 'active' : ''; ?>">
+        <i class="fas fa-check-circle"></i> Active
+      </a>
+      <a href="?<?php echo http_build_query(array_filter(['search' => $search_query, 'status' => 'sitting', 'course' => $filter_course, 'year' => $filter_year])); ?>" class="filter-chip <?php echo $filter_status == 'sitting' ? 'active' : ''; ?>">
+        <i class="fas fa-chair"></i> Sitting-In <span class="count"><?php echo $current_sitin; ?></span>
+      </a>
+      <a href="?<?php echo http_build_query(array_filter(['search' => $search_query, 'status' => 'inactive', 'course' => $filter_course, 'year' => $filter_year])); ?>" class="filter-chip <?php echo $filter_status == 'inactive' ? 'active' : ''; ?>">
+        <i class="fas fa-circle"></i> Inactive
+      </a>
+    </div>
+
+    <!-- Course Filters -->
+    <div class="filter-section" style="border-bottom: none; padding-bottom: 0;">
+      <a href="?<?php echo http_build_query(array_filter(['search' => $search_query, 'status' => $filter_status, 'year' => $filter_year])); ?>" class="filter-chip <?php echo empty($filter_course) ? 'active' : ''; ?>">
+        <i class="fas fa-book"></i> All Courses
+      </a>
+      <a href="?<?php echo http_build_query(array_filter(['search' => $search_query, 'status' => $filter_status, 'course' => 'BSIT', 'year' => $filter_year])); ?>" class="filter-chip <?php echo $filter_course == 'BSIT' ? 'active' : ''; ?>">
+        <i class="fas fa-laptop-code"></i> BSIT <span class="count"><?php echo $course_counts['BSIT'] ?? 0; ?></span>
+      </a>
+      <a href="?<?php echo http_build_query(array_filter(['search' => $search_query, 'status' => $filter_status, 'course' => 'BSCS', 'year' => $filter_year])); ?>" class="filter-chip <?php echo $filter_course == 'BSCS' ? 'active' : ''; ?>">
+        <i class="fas fa-microchip"></i> BSCS <span class="count"><?php echo $course_counts['BSCS'] ?? 0; ?></span>
+      </a>
+      <a href="?<?php echo http_build_query(array_filter(['search' => $search_query, 'status' => $filter_status, 'course' => 'BSIS', 'year' => $filter_year])); ?>" class="filter-chip <?php echo $filter_course == 'BSIS' ? 'active' : ''; ?>">
+        <i class="fas fa-chart-line"></i> BSIS <span class="count"><?php echo $course_counts['BSIS'] ?? 0; ?></span>
+      </a>
     </div>
   </div>
 
-  <!-- Results -->
-  <div class="results-header">
-    <div class="results-count"><i class="fas fa-users"></i> <?php echo $student_count; ?> students found</div>
+  <!-- Sorting & Results -->
+  <div class="sorting-bar">
+    <div class="results-count">
+      <i class="fas fa-users"></i> <?php echo $student_count; ?> student<?php echo $student_count != 1 ? 's' : ''; ?> found
+    </div>
+    <div class="sort-options">
+      <span class="sort-label"><i class="fas fa-sort"></i> Sort by:</span>
+      <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'last_name', 'order' => $sort_by == 'last_name' && $sort_order == 'ASC' ? 'desc' : 'asc'])); ?>" class="sort-link <?php echo $sort_by == 'last_name' ? 'active' : ''; ?>">
+        Name <?php if ($sort_by == 'last_name') echo $sort_order == 'ASC' ? '↑' : '↓'; ?>
+      </a>
+      <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'id_number', 'order' => $sort_by == 'id_number' && $sort_order == 'ASC' ? 'desc' : 'asc'])); ?>" class="sort-link <?php echo $sort_by == 'id_number' ? 'active' : ''; ?>">
+        ID <?php if ($sort_by == 'id_number') echo $sort_order == 'ASC' ? '↑' : '↓'; ?>
+      </a>
+      <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'total_points', 'order' => $sort_by == 'total_points' && $sort_order == 'ASC' ? 'desc' : 'asc'])); ?>" class="sort-link <?php echo $sort_by == 'total_points' ? 'active' : ''; ?>">
+        Points <?php if ($sort_by == 'total_points') echo $sort_order == 'ASC' ? '↑' : '↓'; ?>
+      </a>
+    </div>
   </div>
 
+  <!-- Results Table -->
   <div class="table-card">
     <div class="table-wrapper">
       <table>
@@ -662,52 +861,316 @@ $student_count = $students->num_rows;
             <th>Student</th>
             <th>ID Number</th>
             <th>Course & Year</th>
-            <th>Sessions</th>
+            <th>Sessions Left</th>
+            <th>Points</th>
             <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <?php if ($student_count > 0): ?>
-            <?php while ($row = $students->fetch_assoc()): ?>
-              <?php
-              $full_name = $row['first_name'] . ' ' . $row['last_name'];
-              $initials = strtoupper(substr($row['first_name'], 0, 1) . substr($row['last_name'], 0, 1));
-              $status = 'active';
-              $status_class = 'status-active';
-              $status_text = 'Active';
-              ?>
+            <?php foreach ($processed_students as $row): ?>
               <tr>
                 <td>
                   <div class="student-info">
-                    <div class="student-avatar"><?php echo $initials; ?></div>
-                    <div><?php echo htmlspecialchars($full_name); ?></div>
+                    <div class="student-avatar"><?php echo $row['initials']; ?></div>
+                    <div class="student-details">
+                      <div class="student-name"><?php echo htmlspecialchars($row['full_name']); ?></div>
+                      <div class="student-email"><?php echo htmlspecialchars($row['email'] ?? 'No email'); ?></div>
+                    </div>
                   </div>
                 </td>
                 <td><?php echo htmlspecialchars($row['id_number']); ?></td>
-                <td><?php echo htmlspecialchars($row['course']); ?> <?php echo htmlspecialchars($row['year_level']); ?></td>
-                <td><?php echo $row['sessions']; ?> sessions</td>
-                <td><span class="status-badge <?php echo $status_class; ?>"><?php echo $status_text; ?></span></td>
+                <td><?php echo htmlspecialchars($row['course']); ?> - <?php echo htmlspecialchars($row['year_level']); ?></td>
+                <td><?php echo $row['sessions']; ?> sessions</d>
+                <td>⭐ <?php echo $row['total_points'] ?? 0; ?></td>
+                <td>
+                  <span class="status-badge <?php echo $row['status_class']; ?>">
+                    <i class="fas <?php echo $row['status_icon']; ?>"></i>
+                    <?php echo $row['status_text']; ?>
+                  </span>
+                 </d>
                 <td class="action-icons">
-                  <a href="Student_Information.php?edit=<?php echo $row['id']; ?>"><i class="fas fa-edit" title="Edit"></i></a>
-                  <a href="Student_Information.php?delete=<?php echo $row['id']; ?>" onclick="return confirm('Are you sure?')"><i class="fas fa-trash-alt" title="Delete"></i></a>
-                  <a href="Student_Information.php?view=<?php echo $row['id']; ?>"><i class="fas fa-eye" title="View"></i></a>
-                </td>
+                  <a href="Student_Information.php?edit=<?php echo $row['id_number']; ?>" title="Edit Student">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <a href="javascript:void(0)" onclick="showQuickActions('<?php echo $row['id_number']; ?>', '<?php echo htmlspecialchars($row['full_name']); ?>')" title="Quick Actions">
+                    <i class="fas fa-bolt" style="color:#8B5CF6;"></i>
+                  </a>
+                  <a href="Student_Information.php?view=<?php echo $row['id_number']; ?>" title="View Details">
+                    <i class="fas fa-eye"></i>
+                  </a>
+                  <a href="javascript:void(0)" onclick="confirmDelete('<?php echo $row['id_number']; ?>', '<?php echo htmlspecialchars($row['full_name']); ?>')" title="Delete">
+                    <i class="fas fa-trash-alt"></i>
+                  </a>
+                 </d>
               </tr>
-            <?php endwhile; ?>
+            <?php endforeach; ?>
           <?php else: ?>
             <tr class="empty-row">
-              <td colspan="6" style="text-align: center; padding: 48px;">
-                <i class="fas fa-user-graduate" style="font-size: 48px; color: #CBD5E1; margin-bottom: 16px; display: block;"></i>
-                No students found
-              </td>
-            </tr>
+              <td colspan="7">
+                <i class="fas fa-user-graduate empty-icon"></i>
+                No students found matching your criteria
+               </d>
+             </tr>
           <?php endif; ?>
         </tbody>
       </table>
     </div>
+    
+    <!-- Pagination -->
+    <?php
+    $items_per_page = 15;
+    $total_pages = ceil($student_count / $items_per_page);
+    $current_page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    if ($total_pages > 1):
+    ?>
+    <div class="pagination">
+      <?php if ($current_page > 1): ?>
+        <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $current_page - 1])); ?>" class="page-btn"><i class="fas fa-chevron-left"></i> Prev</a>
+      <?php endif; ?>
+      
+      <?php for ($i = 1; $i <= min(5, $total_pages); $i++): ?>
+        <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $i])); ?>" class="page-btn <?php echo $i == $current_page ? 'active' : ''; ?>"><?php echo $i; ?></a>
+      <?php endfor; ?>
+      
+      <?php if ($total_pages > 5): ?>
+        <span class="page-btn">...</span>
+        <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $total_pages])); ?>" class="page-btn"><?php echo $total_pages; ?></a>
+      <?php endif; ?>
+      
+      <?php if ($current_page < $total_pages): ?>
+        <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $current_page + 1])); ?>" class="page-btn">Next <i class="fas fa-chevron-right"></i></a>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
   </div>
 </div>
+
+<!-- Quick Actions Modal -->
+<div id="quickActionsModal" class="modal">
+  <div class="modal-content">
+    <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+    <p id="modalStudentName" style="margin-bottom: 20px; color: #6C7A91;"></p>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <button onclick="startSitIn()" style="padding: 12px; background: #3B82F6; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600;">
+        <i class="fas fa-chair"></i> Start Sit-in Session
+      </button>
+      <button onclick="addPoints()" style="padding: 12px; background: #10B981; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600;">
+        <i class="fas fa-plus-circle"></i> Add Points
+      </button>
+      <button onclick="viewReservations()" style="padding: 12px; background: #8B5CF6; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600;">
+        <i class="fas fa-calendar-alt"></i> View Reservations
+      </button>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn-cancel" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="modal">
+  <div class="modal-content">
+    <h3><i class="fas fa-trash-alt" style="color: #EF4444;"></i> Delete Student</h3>
+    <p id="deleteMessage" style="margin: 20px 0;"></p>
+    <div class="modal-buttons">
+      <button class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn-confirm" style="background: #EF4444;" onclick="executeDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Store current student ID for actions
+let currentStudentId = null;
+let currentStudentName = '';
+
+// Quick Actions Modal
+function showQuickActions(studentId, studentName) {
+  currentStudentId = studentId;
+  currentStudentName = studentName;
+  document.getElementById('modalStudentName').innerHTML = `<strong>${studentName}</strong><br><span style="font-size: 12px;">ID: ${studentId}</span>`;
+  document.getElementById('quickActionsModal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('quickActionsModal').style.display = 'none';
+  currentStudentId = null;
+}
+
+// Start Sit-in
+function startSitIn() {
+  if (!currentStudentId) return;
+  
+  // Get purpose and lab from prompt or use defaults
+  const purpose = prompt('Enter purpose (Programming, Thesis, Research, etc.):', 'Programming');
+  const lab = prompt('Enter laboratory (Lab 544, Lab 524, Lab 526, Lab 528, Lab 530):', 'Lab 544');
+  
+  if (purpose && lab) {
+    fetch('api/start_sit_in_api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        student_id: currentStudentId, 
+        purpose: purpose, 
+        laboratory: lab 
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert('Sit-in session started successfully!');
+        location.reload();
+      } else {
+        alert('Error: ' + data.message);
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Failed to start sit-in session');
+    });
+  }
+  closeModal();
+}
+
+// Add Points
+function addPoints() {
+  if (!currentStudentId) return;
+  
+  const points = prompt('Enter points to add (1-100):', '5');
+  const reason = prompt('Reason for points:', 'Sit-in Completion');
+  
+  if (points && reason) {
+    fetch('api/add_points_api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        student_id: currentStudentId, 
+        points: parseInt(points), 
+        reason: reason 
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        alert(`Added ${points} points to ${currentStudentName}!`);
+        location.reload();
+      } else {
+        alert('Error: ' + data.message);
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('Failed to add points');
+    });
+  }
+  closeModal();
+}
+
+// View Reservations
+function viewReservations() {
+  window.location.href = `reservation_management.php?student_id=${currentStudentId}`;
+}
+
+// Delete Student
+let deleteStudentId = null;
+let deleteStudentName = '';
+
+function confirmDelete(studentId, studentName) {
+  deleteStudentId = studentId;
+  deleteStudentName = studentName;
+  document.getElementById('deleteMessage').innerHTML = `Are you sure you want to delete <strong>${studentName}</strong> (ID: ${studentId})? This action cannot be undone.`;
+  document.getElementById('deleteModal').style.display = 'flex';
+}
+
+function closeDeleteModal() {
+  document.getElementById('deleteModal').style.display = 'none';
+  deleteStudentId = null;
+}
+
+function executeDelete() {
+  if (!deleteStudentId) return;
+  
+  fetch('api/delete_student_api.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: deleteStudentId })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert(`Student ${deleteStudentName} deleted successfully!`);
+      location.reload();
+    } else {
+      alert('Error: ' + data.message);
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Failed to delete student');
+  });
+  closeDeleteModal();
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+  const quickModal = document.getElementById('quickActionsModal');
+  const deleteModal = document.getElementById('deleteModal');
+  if (event.target === quickModal) closeModal();
+  if (event.target === deleteModal) closeDeleteModal();
+}
+
+// Real-time search (debounced)
+let searchTimeout;
+document.getElementById('searchInput').addEventListener('input', function() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    const searchValue = this.value;
+    if (searchValue.length >= 2 || searchValue.length === 0) {
+      const url = new URL(window.location.href);
+      if (searchValue) {
+        url.searchParams.set('search', searchValue);
+      } else {
+        url.searchParams.delete('search');
+      }
+      window.location.href = url.toString();
+    }
+  }, 500);
+});
+
+// Export functionality
+function exportToCSV() {
+  let csv = [];
+  csv.push(['ID Number', 'Full Name', 'Course', 'Year Level', 'Sessions Left', 'Points', 'Status']);
+  
+  <?php foreach ($processed_students as $row): ?>
+    csv.push([
+      '<?php echo addslashes($row['id_number']); ?>',
+      '<?php echo addslashes($row['full_name']); ?>',
+      '<?php echo addslashes($row['course']); ?>',
+      '<?php echo addslashes($row['year_level']); ?>',
+      <?php echo $row['sessions']; ?>,
+      <?php echo $row['total_points'] ?? 0; ?>,
+      '<?php echo $row['status_text']; ?>'
+    ]);
+  <?php endforeach; ?>
+  
+  const blob = new Blob([csv.map(row => row.join(',')).join('\n')], { type: 'text/csv' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `students_export_<?php echo date('Y-m-d'); ?>.csv`;
+  link.click();
+}
+
+// Keyboard shortcut for search (Ctrl+K)
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    document.getElementById('searchInput').focus();
+  }
+});
+</script>
 
 </body>
 </html>

@@ -106,7 +106,7 @@ $initials     = strtoupper(substr($first_name,0,1) . substr($last_name,0,1));
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Edit Profile</title>
+  <title>CCS Student - Edit Profile</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"/>
   <style>
@@ -139,23 +139,33 @@ $initials     = strtoupper(substr($first_name,0,1) . substr($last_name,0,1));
     .logo-area {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       margin-bottom: 40px;
       padding-left: 8px;
     }
+    
+    .logo-image {
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+      border-radius: 12px;
+    }
+    
     .logo-icon {
       background: #3B82F6;
-      width: 38px;
-      height: 38px;
+      width: 42px;
+      height: 42px;
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 700;
       box-shadow: 0 6px 12px -6px rgba(59,130,246,0.25);
+      display: none;
     }
+    
     .logo-text {
       font-weight: 800;
       font-size: 20px;
@@ -569,7 +579,10 @@ $initials     = strtoupper(substr($first_name,0,1) . substr($last_name,0,1));
 <!-- SIDEBAR -->
 <div class="sidebar">
   <div class="logo-area">
-    <div class="logo-icon"><i class="fas fa-user-graduate"></i></div>
+    <img src="ccslogo2.png" alt="CCS Logo" class="logo-image" onerror="this.onerror=null; this.style.display='none'; document.getElementById('studentFallbackLogo').style.display='flex';">
+    <div id="studentFallbackLogo" class="logo-icon" style="display: none;">
+      <i class="fas fa-user-graduate"></i>
+    </div>
     <div class="logo-text">CCS <span>Student</span></div>
   </div>
   <div class="nav-menu">

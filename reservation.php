@@ -60,10 +60,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reserve'])) {
         if ($check_stmt->get_result()->num_rows > 0) {
             $reservation_error = "You already have a pending reservation for this date.";
         } else {
-            // Insert reservation into database - FIXED: removed sessions_used from INSERT
+            // Insert reservation into database
             $full_name = $user['first_name'] . ' ' . ($user['middle_name'] ? $user['middle_name'] . ' ' : '') . $user['last_name'];
             
-            // FIXED: Only 10 placeholders now (id_number to status, no sessions_used in INSERT)
             $insert_stmt = $conn->prepare("INSERT INTO reservations (student_id, id_number, student_name, course, year_level, purpose, laboratory, reservation_date, time_in, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
             $insert_stmt->bind_param("issssssss", $user_id, $user['id_number'], $full_name, $user['course'], $user['course_level'], $purpose, $laboratory, $reservation_date, $time_in);
             
@@ -162,23 +161,33 @@ $unread_count = count(array_filter($notifications, fn($n) => !$n['is_read']));
     .logo-area {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       margin-bottom: 40px;
       padding-left: 8px;
     }
+    
+    .logo-image {
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+      border-radius: 12px;
+    }
+    
     .logo-icon {
       background: #3B82F6;
-      width: 38px;
-      height: 38px;
+      width: 42px;
+      height: 42px;
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
-      font-size: 18px;
+      font-size: 20px;
       font-weight: 700;
       box-shadow: 0 6px 12px -6px rgba(59,130,246,0.25);
+      display: none;
     }
+    
     .logo-text {
       font-weight: 800;
       font-size: 20px;
@@ -553,7 +562,10 @@ $unread_count = count(array_filter($notifications, fn($n) => !$n['is_read']));
 <!-- SIDEBAR -->
 <div class="sidebar">
   <div class="logo-area">
-    <div class="logo-icon"><i class="fas fa-user-graduate"></i></div>
+    <img src="ccslogo2.png" alt="CCS Logo" class="logo-image" onerror="this.onerror=null; this.style.display='none'; document.getElementById('studentFallbackLogo').style.display='flex';">
+    <div id="studentFallbackLogo" class="logo-icon" style="display: none;">
+      <i class="fas fa-user-graduate"></i>
+    </div>
     <div class="logo-text">CCS <span>Student</span></div>
   </div>
   <div class="nav-menu">

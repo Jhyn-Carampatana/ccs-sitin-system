@@ -91,7 +91,8 @@ $notifications_json = json_encode(array_map(function($n) {
     /* Sidebar */
     .sidebar { width: 280px; background: #FFFFFF; border-right: 1px solid #E9EEF3; display: flex; flex-direction: column; position: fixed; left: 0; top: 0; bottom: 0; padding: 28px 20px; }
     .logo-area { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
-    .logo-icon { background: #3B82F6; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: 700; }
+    .logo-image { width: 42px; height: 42px; object-fit: contain; border-radius: 12px; }
+    .logo-icon { background: #3B82F6; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; font-weight: 700; display: none; }
     .logo-text { font-weight: 800; font-size: 20px; color: #0F172A; }
     .logo-text span { color: #3B82F6; }
     .nav-menu { flex: 1; display: flex; flex-direction: column; gap: 8px; }
@@ -174,7 +175,10 @@ $notifications_json = json_encode(array_map(function($n) {
 
 <div class="sidebar">
   <div class="logo-area">
-    <div class="logo-icon"><i class="fas fa-user-graduate"></i></div>
+    <img src="ccslogo2.png" alt="CCS Logo" class="logo-image" onerror="this.onerror=null; this.style.display='none'; document.getElementById('studentFallbackLogo').style.display='flex';">
+    <div id="studentFallbackLogo" class="logo-icon" style="display: none;">
+      <i class="fas fa-user-graduate"></i>
+    </div>
     <div class="logo-text"><span>CCS</span> Student</div>
   </div>
   <div class="nav-menu">

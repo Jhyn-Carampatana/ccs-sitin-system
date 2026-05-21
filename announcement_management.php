@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS announcements (
 $conn->query($create_table_sql);
 
 // Get admin info
-$admin_name = $_SESSION['admin_name'] ?? 'CCS Admin';
+$admin_name = $_SESSION['admin_name'] ?? 'CCS Administrator';
 $admin_initial = strtoupper(substr($admin_name, 0, 2));
 
 // ==================== ANNOUNCEMENT MANAGEMENT LOGIC ====================
@@ -256,6 +256,7 @@ $today = date('F j, Y');
     font-size: 18px;
     font-weight: 700;
     box-shadow: 0 6px 12px -6px rgba(59,130,246,0.25);
+    display: none;
   }
   
   .logo-text {
@@ -414,13 +415,13 @@ $today = date('F j, Y');
     background: white;
     border-radius: 24px;
     border: 1px solid #EFF3F8;
-    padding: 24px;
+    padding: 28px;
     margin-bottom: 32px;
   }
   .card-title {
     font-size: 18px;
     font-weight: 700;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -430,7 +431,7 @@ $today = date('F j, Y');
   }
   .form-row {
     display: flex;
-    gap: 16px;
+    gap: 20px;
     flex-wrap: wrap;
   }
   .form-group {
@@ -446,15 +447,16 @@ $today = date('F j, Y');
     font-weight: 600;
     text-transform: uppercase;
     color: #6C7A91;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
   }
   .form-group input, .form-group textarea {
     width: 100%;
-    padding: 12px 14px;
+    padding: 14px 16px;
     border: 1.5px solid #E2E8F0;
-    border-radius: 12px;
+    border-radius: 14px;
     font-family: 'Inter', sans-serif;
-    font-size: 14px;
+    font-size: 15px;
     transition: all 0.2s;
   }
   .form-group input:focus, .form-group textarea:focus {
@@ -464,20 +466,20 @@ $today = date('F j, Y');
   }
   .form-group textarea {
     resize: vertical;
-    min-height: 100px;
+    min-height: 120px;
   }
   .btn-create {
     background: #3B82F6;
     color: white;
     border: none;
-    padding: 12px 28px;
+    padding: 14px 32px;
     border-radius: 40px;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 15px;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     transition: all 0.2s;
     margin-top: 24px;
   }
@@ -540,9 +542,9 @@ $today = date('F j, Y');
     flex-wrap: wrap;
   }
   .filter-btn {
-    padding: 8px 20px;
+    padding: 10px 24px;
     border-radius: 40px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     border: 1.5px solid #E2E8F0;
@@ -564,13 +566,14 @@ $today = date('F j, Y');
   .announcements-list {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
+    padding: 24px;
   }
   .announcement-item {
     background: white;
     border-radius: 20px;
     border: 1px solid #EFF3F8;
-    padding: 20px;
+    padding: 24px;
     transition: all 0.2s;
   }
   .announcement-item:hover {
@@ -579,42 +582,47 @@ $today = date('F j, Y');
   .announcement-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 12px;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 12px;
   }
   .announcement-title {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
     color: #0F172A;
   }
   .announcement-meta {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
-    font-size: 12px;
+    gap: 16px;
+    margin-bottom: 14px;
+    font-size: 13px;
     color: #6C7A91;
+    flex-wrap: wrap;
   }
   .announcement-meta i {
-    margin-right: 4px;
+    margin-right: 6px;
+    width: 14px;
   }
   .announcement-content {
-    font-size: 14px;
-    color: #1E293B;
-    line-height: 1.5;
-    margin-bottom: 16px;
+    font-size: 15px;
+    color: #334155;
+    line-height: 1.6;
+    margin-bottom: 20px;
   }
   .announcement-actions {
     display: flex;
     gap: 12px;
-    padding-top: 12px;
+    padding-top: 16px;
     border-top: 1px solid #F0F2F5;
+    flex-wrap: wrap;
   }
   .status-badge {
     display: inline-block;
-    padding: 4px 12px;
+    padding: 6px 14px;
     border-radius: 40px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
   }
   .status-active {
@@ -629,60 +637,65 @@ $today = date('F j, Y');
     background: #F59E0B;
     color: white;
     border: none;
-    padding: 6px 14px;
-    border-radius: 8px;
-    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    transition: all 0.2s;
   }
   .btn-deactivate {
     background: #EF4444;
     color: white;
     border: none;
-    padding: 6px 14px;
-    border-radius: 8px;
-    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    transition: all 0.2s;
   }
   .btn-activate {
     background: #10B981;
     color: white;
     border: none;
-    padding: 6px 14px;
-    border-radius: 8px;
-    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    transition: all 0.2s;
   }
   .btn-delete {
     background: #6C7A91;
     color: white;
     border: none;
-    padding: 6px 14px;
-    border-radius: 8px;
-    font-size: 12px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    transition: all 0.2s;
   }
   .btn-edit:hover, .btn-deactivate:hover, .btn-activate:hover, .btn-delete:hover {
-    opacity: 0.8;
+    opacity: 0.85;
+    transform: translateY(-1px);
   }
 
   /* Toolbar */
@@ -690,7 +703,7 @@ $today = date('F j, Y');
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 24px;
+    padding: 20px 24px;
     border-bottom: 1px solid #F0F2F5;
     flex-wrap: wrap;
     gap: 12px;
@@ -701,14 +714,14 @@ $today = date('F j, Y');
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 13px;
+    font-size: 14px;
     color: #6C7A91;
   }
   .entries-select {
     border: 1.5px solid #E2E8F0;
     border-radius: 10px;
     padding: 8px 32px 8px 14px;
-    font-size: 13px;
+    font-size: 14px;
     font-family: 'Inter', sans-serif;
     background: white;
     cursor: pointer;
@@ -725,9 +738,9 @@ $today = date('F j, Y');
   .search-box input {
     border: 1.5px solid #E2E8F0;
     border-radius: 10px;
-    padding: 8px 14px;
-    font-size: 13px;
-    width: 240px;
+    padding: 10px 16px;
+    font-size: 14px;
+    width: 260px;
     outline: none;
   }
   .search-box input:focus {
@@ -736,10 +749,12 @@ $today = date('F j, Y');
   .search-box button {
     background: #3B82F6;
     border: none;
-    padding: 8px 16px;
+    padding: 10px 20px;
     border-radius: 10px;
     color: white;
     cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
   }
 
   /* Footer */
@@ -747,7 +762,7 @@ $today = date('F j, Y');
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 24px;
+    padding: 20px 24px;
     border-top: 1px solid #F0F2F5;
     flex-wrap: wrap;
     gap: 12px;
@@ -755,7 +770,7 @@ $today = date('F j, Y');
     border-radius: 0 0 24px 24px;
   }
   .showing-info {
-    font-size: 12px;
+    font-size: 13px;
     color: #6C7A91;
   }
   .pagination {
@@ -763,13 +778,13 @@ $today = date('F j, Y');
     gap: 6px;
   }
   .page-btn {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     border: 1.5px solid #E2E8F0;
     border-radius: 10px;
     background: white;
     color: #3B82F6;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     display: flex;
@@ -791,6 +806,14 @@ $today = date('F j, Y');
     cursor: default;
   }
 
+  /* Table Card */
+  .table-card {
+    background: white;
+    border-radius: 24px;
+    border: 1px solid #EFF3F8;
+    overflow: hidden;
+  }
+
   /* Modal */
   .modal {
     display: none;
@@ -809,23 +832,24 @@ $today = date('F j, Y');
     border-radius: 24px;
     width: 500px;
     max-width: 90%;
-    padding: 24px;
+    padding: 28px;
   }
   .modal-header {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
   .modal input, .modal textarea {
     width: 100%;
-    padding: 10px 14px;
+    padding: 12px 16px;
     border: 1.5px solid #E2E8F0;
     border-radius: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
     font-family: 'Inter', sans-serif;
+    font-size: 14px;
   }
   .modal textarea {
-    min-height: 100px;
+    min-height: 120px;
     resize: vertical;
   }
   .modal-buttons {
@@ -842,9 +866,9 @@ $today = date('F j, Y');
     right: 24px;
     background: #1E293B;
     color: white;
-    padding: 12px 20px;
-    border-radius: 12px;
-    font-size: 13px;
+    padding: 14px 24px;
+    border-radius: 14px;
+    font-size: 14px;
     transform: translateY(60px);
     opacity: 0;
     transition: all 0.3s;
@@ -896,12 +920,14 @@ $today = date('F j, Y');
     <a href="announcement_management.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'announcement_management.php' ? 'active' : ''; ?>">
       <i class="fas fa-bullhorn"></i> Announcements
     </a>
-    <a href="reports.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'admin_reports.php' ? 'active' : ''; ?>">
+    <a href="reports.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>">
       <i class="fas fa-chart-pie"></i> Reports
     </a>
     <a href="leaderboard.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'leaderboard.php' ? 'active' : ''; ?>">
       <i class="fas fa-trophy"></i> Leaderboard
     </a>
+    <a href="add_points.php" class="nav-item"><i class="fas fa-plus-circle"></i> Add Perusal/Point</a>
+    <a href="view_performance.php" class="nav-item"><i class="fas fa-chart-simple"></i> View Performance</a>
   </div>
   <div class="bottom-user">
     <div class="user-avatar"><?php echo $admin_initial; ?></div>
@@ -1011,7 +1037,7 @@ $today = date('F j, Y');
       </div>
     </div>
 
-    <div class="announcements-list" style="padding: 24px;">
+    <div class="announcements-list">
       <?php if ($announcements && $announcements->num_rows > 0): ?>
         <?php while ($row = $announcements->fetch_assoc()): ?>
           <div class="announcement-item">
@@ -1049,10 +1075,10 @@ $today = date('F j, Y');
           </div>
         <?php endwhile; ?>
       <?php else: ?>
-        <div style="text-align: center; padding: 48px;">
-          <i class="fas fa-bullhorn" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5; display: block;"></i>
-          No announcements found<br>
-          <span style="font-size: 12px;">Click "Create New Announcement" to add one.</span>
+        <div style="text-align: center; padding: 60px;">
+          <i class="fas fa-bullhorn" style="font-size: 56px; margin-bottom: 20px; opacity: 0.4; display: block;"></i>
+          <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">No announcements found</div>
+          <span style="font-size: 13px; color: #6C7A91;">Click "Create New Announcement" to add one.</span>
         </div>
       <?php endif; ?>
     </div>

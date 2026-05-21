@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS reservations (
 $conn->query($create_reservations_table);
 
 // Get admin info
-$admin_name = $_SESSION['admin_name'] ?? 'CCS Admin';
+$admin_name = $_SESSION['admin_name'] ?? 'CCS Administrator';
 $admin_initial = strtoupper(substr($admin_name, 0, 2));
 
 // ==================== RESERVATION MANAGEMENT LOGIC ====================
@@ -217,6 +217,7 @@ $today = date('F j, Y');
     font-size: 18px;
     font-weight: 700;
     box-shadow: 0 6px 12px -6px rgba(59,130,246,0.25);
+    display: none;
   }
   
   .logo-text {
@@ -427,7 +428,7 @@ $today = date('F j, Y');
   .filter-btn {
     padding: 8px 20px;
     border-radius: 40px;
-    fontSize: 13px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
     border: 1.5px solid #E2E8F0;
@@ -591,6 +592,8 @@ $today = date('F j, Y');
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
   }
   .btn-approve:hover, .btn-reject:hover, .btn-delete:hover {
     opacity: 0.8;
@@ -704,12 +707,14 @@ $today = date('F j, Y');
     <a href="announcement_management.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'announcement_management.php' ? 'active' : ''; ?>">
       <i class="fas fa-bullhorn"></i> Announcements
     </a>
-    <a href="admin_reports.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'admin_reports.php' ? 'active' : ''; ?>">
+    <a href="reports.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : ''; ?>">
       <i class="fas fa-chart-pie"></i> Reports
     </a>
     <a href="leaderboard.php" class="nav-item <?php echo basename($_SERVER['PHP_SELF']) == 'leaderboard.php' ? 'active' : ''; ?>">
       <i class="fas fa-trophy"></i> Leaderboard
     </a>
+    <a href="add_points.php" class="nav-item"><i class="fas fa-plus-circle"></i> Add Perusal/Point</a>
+    <a href="view_performance.php" class="nav-item"><i class="fas fa-chart-simple"></i> View Performance</a>
   </div>
   <div class="bottom-user">
     <div class="user-avatar"><?php echo $admin_initial; ?></div>
@@ -836,17 +841,17 @@ $today = date('F j, Y');
                   <span class="course-year">
                     <?php echo htmlspecialchars($row['course'] ?? 'N/A'); ?> · <?php echo htmlspecialchars($row['year_level'] ?? 'N/A'); ?>
                   </span>
-                </td>
-                <td><?php echo htmlspecialchars($row['purpose']); ?></td>
-                <td><?php echo htmlspecialchars($row['laboratory']); ?></td>
-                <td><?php echo date('M j, Y', strtotime($row['reservation_date'])); ?></td>
-                <td><?php echo date('g:i A', strtotime($row['time_in'])); ?></td>
-                <td><?php echo $row['sessions'] ?? 'N/A'; ?></td>
+                 </d>
+                <td><?php echo htmlspecialchars($row['purpose']); ?></d>
+                <td><?php echo htmlspecialchars($row['laboratory']); ?></d>
+                <td><?php echo date('M j, Y', strtotime($row['reservation_date'])); ?></d>
+                <td><?php echo date('g:i A', strtotime($row['time_in'])); ?></d>
+                <td><?php echo $row['sessions'] ?? 'N/A'; ?></d>
                 <td>
                   <span class="status-badge status-<?php echo $row['status']; ?>">
                     <?php echo ucfirst($row['status']); ?>
                   </span>
-                </td>
+                 </d>
                 <td class="action-buttons">
                   <?php if ($row['status'] === 'pending'): ?>
                     <form method="POST" style="display: inline-block;">
@@ -867,7 +872,7 @@ $today = date('F j, Y');
                   <a href="?delete_id=<?php echo $row['id']; ?>&entries=<?php echo $entries_per_page; ?>&search=<?php echo urlencode($search); ?>&status=<?php echo $status_filter; ?>&page=<?php echo $page; ?>" class="btn-delete" onclick="return confirm('Delete this reservation?')">
                     <i class="fas fa-trash"></i> Delete
                   </a>
-                </td>
+                 </d>
               </tr>
             <?php endwhile; ?>
           <?php else: ?>
@@ -876,11 +881,11 @@ $today = date('F j, Y');
                 <i class="fas fa-calendar-times" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5; display: block;"></i>
                 No reservations found<br>
                 <span style="font-size: 12px;">Try adjusting your search or filter criteria.</span>
-              </td>
-            </tr>
+               </d>
+             </tr>
           <?php endif; ?>
         </tbody>
-      </table>
+       </table>
     </div>
 
     <div class="footer-bar">
