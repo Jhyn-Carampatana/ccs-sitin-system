@@ -62,6 +62,7 @@ $student_email = htmlspecialchars($user['email'] ?? 'N/A');
 $student_address = htmlspecialchars($user['address'] ?? 'N/A');
 $profile_pic = htmlspecialchars($user['profile_pic'] ?? '');
 $student_id = htmlspecialchars($user['id_number'] ?? 'N/A');
+$current_points = $user['total_points'] ?? 0;
 $initials = strtoupper(substr($user['first_name'] ?? '', 0, 1) . substr($user['last_name'] ?? '', 0, 1));
 
 // Convert notifications to JSON for JavaScript
@@ -141,8 +142,8 @@ $notifications_json = json_encode(array_map(function($n) {
     .stat-number { font-size: 34px; font-weight: 800; color: #0F172A; }
     .stat-icon { width: 48px; height: 48px; background: #EFF6FF; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: #3B82F6; font-size: 22px; }
     
-    /* Mid Row */
-    .mid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+    /* Mid Row - 3 columns */
+    .mid-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 32px; }
     .card { background: white; border-radius: 24px; border: 1px solid #EFF3F8; padding: 24px; }
     .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
     .card-header i { font-size: 20px; color: #3B82F6; background: #EFF6FF; padding: 8px; border-radius: 14px; }
@@ -158,6 +159,19 @@ $notifications_json = json_encode(array_map(function($n) {
     .avatar-circle-large svg { width: 55px; height: 55px; fill: #3B82F6; }
     .announce-meta { font-size: 11px; font-weight: 600; color: #3B82F6; margin-bottom: 6px; }
     .announce-box { background: #F8FAFE; border-left: 3px solid #3B82F6; padding: 14px 16px; border-radius: 14px; font-size: 13px; margin-bottom: 16px; color: #334155; }
+    
+    /* Rewards Widget */
+    .rewards-progress { margin-bottom: 20px; }
+    .progress-label { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+    .progress-bar-bg { height: 10px; background: #E2E8F0; border-radius: 10px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #3B82F6, #10B981); border-radius: 10px; width: 0%; }
+    .reward-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #F8FAFE; border-radius: 12px; margin-bottom: 10px; }
+    .reward-item:last-child { margin-bottom: 0; }
+    .btn-claim { background: #3B82F6; color: white; border: none; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-claim:hover { background: #2563EB; transform: translateY(-1px); }
+    .btn-claim.disabled { background: #CBD5E1; cursor: not-allowed; }
+    .view-all-link { display: block; text-align: center; margin-top: 16px; font-size: 12px; color: #3B82F6; text-decoration: none; }
+    .view-all-link:hover { text-decoration: underline; }
     
     /* Footer Card */
     .footer-card { background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border-radius: 24px; padding: 20px 28px; display: flex; justify-content: space-between; align-items: center; }
@@ -186,6 +200,8 @@ $notifications_json = json_encode(array_map(function($n) {
     <a href="editProfile.php" class="nav-item"><i class="fas fa-user-edit"></i> Edit Profile</a>
     <a href="history.php" class="nav-item"><i class="fas fa-history"></i> History</a>
     <a href="reservation.php" class="nav-item"><i class="fas fa-calendar-alt"></i> Reservation</a>
+    <a href="student_rules.php" class="nav-item"><i class="fas fa-gavel"></i> Lab Rules</a>
+    <a href="student_rewards.php" class="nav-item"><i class="fas fa-gift"></i> Rewards/Points</a>
   </div>
   <div class="bottom-user">
     <div class="user-avatar"><?php echo $initials; ?></div>
@@ -284,6 +300,54 @@ $notifications_json = json_encode(array_map(function($n) {
         <div class="announce-box">No announcements available at this time.</div>
       <?php endif; ?>
     </div>
+
+    <!-- Rewards/Points Widget Card -->
+    <div class="card">
+      <div class="card-header"><i class="fas fa-gift"></i><h3>My Rewards & Points</h3></div>
+      
+      <?php
+      // Calculate points progress
+      $max_points = 2000;
+      $points_percentage = min(($current_points / $max_points) * 100, 100);
+      $points_remaining = $max_points - $current_points;
+      ?>
+      
+      <div class="rewards-progress">
+        <div class="progress-label">
+          <span><i class="fas fa-star" style="color: #F59E0B;"></i> Points Progress</span>
+          <span style="font-weight: 700; color: #3B82F6;"><?php echo number_format($current_points); ?> / <?php echo number_format($max_points); ?></span>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-fill" style="width: <?php echo $points_percentage; ?>%;"></div>
+        </div>
+        <div style="font-size: 11px; color: #6C7A91; margin-top: 8px;">
+          <?php echo $points_remaining > 0 ? "✨ $points_remaining more points to reach the next reward!" : "🎉 Congratulations! You've reached the maximum points!"; ?>
+        </div>
+      </div>
+      
+      <div style="margin-top: 16px;">
+        <div style="font-size: 12px; font-weight: 600; color: #6C7A91; margin-bottom: 12px;">🎁 Available Rewards</div>
+        
+        <div class="reward-item">
+          <div><i class="fas fa-coffee" style="color: #D97706; width: 24px;"></i> <span style="font-size: 13px;">10% Off Canteen Voucher</span></div>
+          <button class="btn-claim" onclick="claimReward('Canteen Voucher', 20, <?php echo $current_points; ?>)">Claim (20 pts)</button>
+        </div>
+        
+        <div class="reward-item">
+          <div><i class="fas fa-print" style="color: #8B5CF6; width: 24px;"></i> <span style="font-size: 13px;">Free Printing (10 pages)</span></div>
+          <button class="btn-claim" onclick="claimReward('Free Printing', 35, <?php echo $current_points; ?>)">Claim (35 pts)</button>
+        </div>
+        
+        <div class="reward-item">
+          <div><i class="fas fa-certificate" style="color: #F59E0B; width: 24px;"></i> <span style="font-size: 13px;">CCS Merit Certificate</span></div>
+          <button class="btn-claim" onclick="claimReward('Merit Certificate', 50, <?php echo $current_points; ?>)">Claim (50 pts)</button>
+        </div>
+      </div>
+      
+      <a href="student_rewards.php" class="view-all-link">
+        View All Rewards <i class="fas fa-arrow-right"></i>
+      </a>
+    </div>
   </div>
 
   <!-- Footer Card -->
@@ -349,6 +413,17 @@ $notifications_json = json_encode(array_map(function($n) {
     fetch('mark_notifications_read.php', { method: 'POST' })
       .then(() => { notifications.forEach(n => n.read = true); unreadCount = 0; updateNotificationBadge(); renderNotifications(); })
       .catch(err => console.error('Error marking notifications as read:', err));
+  }
+
+  function claimReward(rewardName, points, currentPoints) {
+    if (currentPoints >= points) {
+      if (confirm(`Redeem ${rewardName} for ${points} points?`)) {
+        alert(`✅ "${rewardName}" has been claimed! Please visit the CCS office to claim your reward.`);
+        // Here you can add AJAX call to record redemption in database
+      }
+    } else {
+      alert(`❌ You need ${points - currentPoints} more points to claim this reward.`);
+    }
   }
 
   updateNotificationBadge();

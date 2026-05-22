@@ -529,6 +529,8 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
     <a href="editProfile.php" class="nav-item"><i class="fas fa-user-edit"></i> Edit Profile</a>
     <a href="history.php" class="nav-item active"><i class="fas fa-history"></i> History</a>
     <a href="reservation.php" class="nav-item"><i class="fas fa-calendar-alt"></i> Reservation</a>
+    <a href="student_rules.php" class="nav-item"><i class="fas fa-gavel"></i> Lab Rules</a>
+    <a href="student_rewards.php" class="nav-item"><i class="fas fa-gift"></i> Rewards/Points</a>
   </div>
   <div class="bottom-user">
     <div class="user-avatar"><?php echo $initials ?: '?'; ?></div>
@@ -615,7 +617,7 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
               <td colspan="9">
                 <i class="fas fa-folder-open" style="margin-right: 8px;"></i>No history entries found
                </d>
-            </table>
+            </tr>
           <?php endif; ?>
         </tbody>
       </table>
@@ -650,7 +652,7 @@ $initials = strtoupper(substr($_SESSION['name'] ?? '', 0, 1) . substr($_SESSION[
     tbody.innerHTML = '';
 
     if (pageData.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="no-data"><i class="fas fa-folder-open" style="margin-right: 8px;"></i>No entries found</td></tr>';
+      tbody.innerHTML = '<td><td colspan="9" class="no-data"><i class="fas fa-folder-open" style="margin-right: 8px;"></i>No entries found</td></tr>';
     } else {
       pageData.forEach(row => {
         const tr = document.createElement('tr');

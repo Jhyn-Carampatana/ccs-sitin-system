@@ -590,6 +590,8 @@ $initials     = strtoupper(substr($first_name,0,1) . substr($last_name,0,1));
     <a href="editProfile.php" class="nav-item active"><i class="fas fa-user-edit"></i> Edit Profile</a>
     <a href="history.php" class="nav-item"><i class="fas fa-history"></i> History</a>
     <a href="reservation.php" class="nav-item"><i class="fas fa-calendar-alt"></i> Reservation</a>
+    <a href="student_rules.php" class="nav-item"><i class="fas fa-gavel"></i> Lab Rules</a>
+    <a href="student_rewards.php" class="nav-item"><i class="fas fa-gift"></i> Rewards/Points</a>
   </div>
   <div class="bottom-user">
     <div class="user-avatar"><?php echo $initials ?: '?'; ?></div>
