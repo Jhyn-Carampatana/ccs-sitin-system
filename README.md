@@ -1,3 +1,3 @@
 "# CCS Sit-in Management System" 
-"- Id# or username: admin" 
-"- Password: admin123" 
+"- Id Number or username: "admin" 
+"- Password: "admin123" 
